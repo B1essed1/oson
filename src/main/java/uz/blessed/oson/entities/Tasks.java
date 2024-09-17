@@ -24,4 +24,13 @@ public class Tasks extends BaseEntity {
     @Column(name = "status")
     @Enumerated(EnumType.STRING)
     private STATUS status;
+
+    public static Tasks create(String title, String description, LocalDateTime dueDate, STATUS status) {
+        Tasks task = new Tasks();
+        task.setTitle(title);
+        task.setDescription(description);
+        task.setDueDate(dueDate);
+        task.setStatus(status);
+        return task;
+    }
 }
