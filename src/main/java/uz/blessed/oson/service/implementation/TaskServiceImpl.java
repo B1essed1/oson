@@ -12,9 +12,11 @@ import uz.blessed.oson.entities.Tasks;
 import uz.blessed.oson.exception.ExceptionWithStatusCode;
 import uz.blessed.oson.repositories.TaskRepository;
 import uz.blessed.oson.service.TaskService;
+import uz.blessed.oson.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class TaskServiceImpl implements TaskService {
@@ -39,9 +41,9 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public TaskResponse updateTask(Long id, TaskRequest taskRequest) {
         var task = taskRepository.findById(id)
-                .orElseThrow(()->new ExpressionException(404,"oson.task.not.found"));
+                .orElseThrow(() -> new ExpressionException(404, "oson.task.not.found"));
 
-        task =  taskRequest.update(task);
+        task = taskRequest.update(task);
 
         task = taskRepository.save(task);
 
@@ -52,7 +54,7 @@ public class TaskServiceImpl implements TaskService {
     public TaskResponse deleteTask(Long id) {
 
         var task = taskRepository.findById(id)
-                .orElseThrow(()->new ExpressionException(404,"oson.task.not.found"));
+                .orElseThrow(() -> new ExpressionException(404, "oson.task.not.found"));
         taskRepository.delete(task);
 
         return getTaskResponse(task);
@@ -60,13 +62,20 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public Page<TaskResponse> getAllTasks(TaskFilter filter) {
-        return taskRepository.findAll(getSpecifications(filter),filter.getPageable()).map(getTaskResponse()::convertToResponse);
+        if (Objects.nonNull(filter.getDueDate())){
+            if (Utils.isValidDate(filter.getDueDate())){
+                filter.setDueLocalDateTime(Utils.convertToLocalDateTime(filter.getDueDate()));
+            } else {
+                throw new ExceptionWithStatusCode(400, "oson.task.duedate.not.valid");
+            }
+        }
+        return taskRepository.findAll(getSpecifications(filter), filter.getPageable()).map(getTaskResponse()::convertToResponse);
     }
 
     @Override
     public TaskResponse getById(Long id) {
         var task = taskRepository.findById(id)
-                .orElseThrow(()-> new ExceptionWithStatusCode(400, "oson.task.not.found"));
+                .orElseThrow(() -> new ExceptionWithStatusCode(400, "oson.task.not.found"));
         return getTaskResponse(task);
     }
 
@@ -75,13 +84,21 @@ public class TaskServiceImpl implements TaskService {
     }
 
 
-
-
     public Specification<Tasks> getSpecifications(TaskFilter filter) {
         return (root, query, criteriaBuilder) -> {
 
             List<Predicate> predicates = new ArrayList<>();
 
+            if (filter.getTitle() != null) {
+                predicates.add(criteriaBuilder.like(root.get("title"), "%" + filter.getTitle() + "%"));
+            }
+            if (filter.getDueLocalDateTime() != null) {
+                predicates.add(criteriaBuilder.greaterThan(root.get("dueDate"), filter.getDueLocalDateTime()));
+            }
+
+            if (filter.getStatus()!= null){
+                predicates.add(criteriaBuilder.equal(root.get("status"), filter.getStatus()));
+            }
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }
